@@ -1,9 +1,9 @@
 package main
 
 import (
-	"avito-banner-service/internal/http-server/router"
-	"avito-banner-service/internal/repositories/postgres"
-	"avito-banner-service/internal/repositories/redis"
+	"banner-service/internal/http-server/router"
+	"banner-service/internal/repositories/postgres"
+	"banner-service/internal/repositories/redis"
 	"fmt"
 	"log"
 	"log/slog"

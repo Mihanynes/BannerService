@@ -1,7 +1,7 @@
 package mock_cache
 
 import (
-	ourRedis "avito-banner-service/internal/repositories/redis"
+	ourRedis "banner-service/internal/repositories/redis"
 	"context"
 	"fmt"
 	"github.com/redis/go-redis/v9"

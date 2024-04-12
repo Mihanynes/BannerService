@@ -1,7 +1,7 @@
 package postgres
 
 import (
-	"avito-banner-service/internal/models"
+	"banner-service/internal/models"
 	"context"
 	"database/sql"
 	"fmt"
@@ -27,14 +27,13 @@ type Storage struct {
 }
 
 func New() (*Storage, error) {
-	// connection string
+
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	fmt.Println("ready to connect psql")
-	// open database
+
 	db, err := sql.Open("postgres", psqlconn)
 	CheckError(err)
 
-	// check db
 	err = db.Ping()
 	CheckError(err)
 
@@ -111,11 +110,9 @@ func GetBannersFilteredByFeatureOrTagId(storage *Storage, tagVal models.NilInt, 
 		return []models.UserBannerFilteredResponse{}, err
 	}
 
-	//fmt.Println(rows)
 	banners := []models.UserBannerFilteredResponse{}
 	bannerIdPositionMap := make(map[int]int)
 	for rows.Next() {
-		//fmt.Println(rows)
 		var banner models.UserBannerFilteredResponse
 		var tagId int
 		rows.Scan(&banner.BannerId, &banner.Content, &banner.IsActive, &banner.FeatureId, &banner.CreatedAt, &banner.UpdatedAt, &tagId)

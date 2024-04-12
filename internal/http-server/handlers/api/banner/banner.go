@@ -1,9 +1,9 @@
 package banner
 
 import (
-	"avito-banner-service/internal/models"
-	"avito-banner-service/internal/repositories/postgres"
-	"avito-banner-service/internal/repositories/redis"
+	"banner-service/internal/models"
+	"banner-service/internal/repositories/postgres"
+	"banner-service/internal/repositories/redis"
 	"encoding/json"
 	"fmt"
 	"github.com/go-playground/validator/v10"

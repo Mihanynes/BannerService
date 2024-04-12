@@ -1,7 +1,7 @@
 package redis
 
 import (
-	"avito-banner-service/internal/models"
+	"banner-service/internal/models"
 	"context"
 	"encoding/json"
 	"fmt"

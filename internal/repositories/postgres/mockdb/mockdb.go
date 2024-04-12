@@ -1,8 +1,8 @@
 package mockdb
 
 import (
-	"avito-banner-service/internal/models"
-	"avito-banner-service/internal/repositories/postgres"
+	"banner-service/internal/models"
+	"banner-service/internal/repositories/postgres"
 	"context"
 	"database/sql"
 	"fmt"

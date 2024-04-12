@@ -1,11 +1,11 @@
 package main
 
 import (
-	"avito-banner-service/internal/http-server/router"
-	"avito-banner-service/internal/models"
-	"avito-banner-service/internal/repositories/postgres"
-	"avito-banner-service/internal/repositories/postgres/mockdb"
-	"avito-banner-service/internal/repositories/redis/mock-cache"
+	"banner-service/internal/http-server/router"
+	"banner-service/internal/models"
+	"banner-service/internal/repositories/postgres"
+	"banner-service/internal/repositories/postgres/mockdb"
+	"banner-service/internal/repositories/redis/mock-cache"
 	"encoding/json"
 	"fmt"
 	"net/http"

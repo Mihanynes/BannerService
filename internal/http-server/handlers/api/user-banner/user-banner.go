@@ -1,9 +1,9 @@
 package user_banner
 
 import (
-	"avito-banner-service/internal/models"
-	"avito-banner-service/internal/repositories/postgres"
-	"avito-banner-service/internal/repositories/redis"
+	"banner-service/internal/models"
+	"banner-service/internal/repositories/postgres"
+	"banner-service/internal/repositories/redis"
 	"github.com/gofiber/fiber/v2"
 	"log/slog"
 	"strconv"
