@@ -1,9 +1,10 @@
-package user_banner
+// user_banner/user_banner.go
+
+package api
 
 import (
 	"banner-service/internal/models"
-	"banner-service/internal/repositories/postgres"
-	"banner-service/internal/repositories/redis"
+	"banner-service/internal/repositories"
 	"github.com/gofiber/fiber/v2"
 	"log/slog"
 	"strconv"
@@ -16,7 +17,7 @@ type UserBannerRequest struct {
 	Token          string `json:"token" default:"user_token"`
 }
 
-func GetBannerById(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler {
+func GetBannerById(cache repositories.Cache, db repositories.Database) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		tagID, err := strconv.Atoi(c.Query("tag_id"))
 		if err != nil {
@@ -30,23 +31,23 @@ func GetBannerById(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler
 		}
 		useLastRevision := c.Query("use_last_revision") == "true"
 
-		if redis.IsEmptyBammer(*redisClient, tagID, featureID) {
-			slog.Error("no banner info from redis")
+		if cache.IsEmptyBanner(tagID, featureID) {
+			slog.Error("no banner info from cache")
 			return c.Status(fiber.StatusNotFound).SendString("Banner not found in cache")
 		}
 
 		var banner models.UserBanner
-		isCached := redis.GetBannerById(*redisClient, tagID, featureID, &banner)
+		isCached := cache.GetBannerById(tagID, featureID, &banner)
 		if useLastRevision || !isCached {
-			banner, err = postgres.GetUserBannerByTagIdAndFeatureId(db, tagID, featureID)
+			banner, err = db.GetUserBannerByTagIdAndFeatureId(tagID, featureID)
 			if err != nil {
 				slog.Error("error while getting banner from database: ", err)
-				redis.PutEmptyBanner(*redisClient, tagID, featureID)
+				cache.PutEmptyBanner(tagID, featureID)
 				return c.Status(fiber.StatusNotFound).SendString("Banner not found in database")
 			}
 		}
 
-		redis.PutBanner(*redisClient, tagID, featureID, banner)
+		cache.PutBanner(tagID, featureID, banner)
 
 		if !banner.IsActive && c.Get("token") != "admin_token" {
 			return c.Status(fiber.StatusForbidden).SendString("Banner is not active or unauthorized access")

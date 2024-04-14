@@ -27,7 +27,6 @@ type Storage struct {
 }
 
 func New() (*Storage, error) {
-
 	psqlconn := fmt.Sprintf("host=%s port=%d user=%s password=%s dbname=%s sslmode=disable", host, port, user, password, dbname)
 	fmt.Println("ready to connect psql")
 
@@ -39,11 +38,21 @@ func New() (*Storage, error) {
 
 	fmt.Println("Connected!")
 
-	initQuery := readInitFile()
-	rows, err := db.Query(initQuery)
+	storage := &Storage{Db: db}
+
+	if err := storage.initialize(); err != nil {
+		return nil, err
+	}
+
+	return storage, nil
+}
+
+func (s *Storage) initialize() error {
+	// Run initialization queries for database setup
+	initQuery := s.readInitFile()
+	rows, err := s.Db.Query(initQuery)
 	if err != nil {
-		log.Fatal(err)
-		panic(err)
+		return err
 	}
 
 	for rows.Next() {
@@ -53,15 +62,16 @@ func New() (*Storage, error) {
 	}
 	fmt.Println("success read init sql file")
 
-	fillQuery := readFillFile()
-	rows, err = db.Query(fillQuery)
+	// Fill database with test data
+	fillQuery := s.readFillFile()
+	_, err = s.Db.Query(fillQuery)
 	if err != nil {
 		fmt.Println("error while fill test data. continue with that data or rebuild postgres container")
 		//log.Fatal(err)
 		//panic(err)
 	}
 
-	return &Storage{Db: db}, nil
+	return nil
 }
 
 func CheckError(err error) {
@@ -71,7 +81,7 @@ func CheckError(err error) {
 	}
 }
 
-func readInitFile() string {
+func (s *Storage) readInitFile() string {
 	file, err := os.Open("resources/database/init.sql")
 	slog.Info("in read init", err)
 	CheckError(err)
@@ -81,7 +91,7 @@ func readInitFile() string {
 	return string(b)
 }
 
-func readFillFile() string {
+func (s *Storage) readFillFile() string {
 	file, err := os.Open("resources/database/fill.sql")
 	CheckError(err)
 	b, err := io.ReadAll(file)
@@ -90,16 +100,16 @@ func readFillFile() string {
 	return string(b)
 }
 
-func GetUserBannerByTagIdAndFeatureId(storage *Storage, tagId int, featureId int) (models.UserBanner, error) {
+func (s *Storage) GetUserBannerByTagIdAndFeatureId(tagId int, featureId int) (models.UserBanner, error) {
 	var banner models.UserBanner
-	err := storage.Db.QueryRow(`SELECT ub.id, ub.content, ub.is_active 
+	err := s.Db.QueryRow(`SELECT ub.id, ub.content, ub.is_active 
 										FROM user_banners_tags join user_banners ub on ub.id = user_banners_tags.banner_id 
 										where feature_id = $1 and tag_id = $2;`, featureId, tagId).Scan(&banner.Id, &banner.Content, &banner.IsActive)
 	return banner, err
 }
 
-func GetBannersFilteredByFeatureOrTagId(storage *Storage, tagVal models.NilInt, featureVal models.NilInt, limit int, offset int) ([]models.UserBannerFilteredResponse, error) {
-	rows, err := storage.Db.Query(`SELECT ub.id, ub.content, ub.is_active, ub.feature_id, ub.created_at, ub.updated_at, tag_id
+func (s *Storage) GetBannersFilteredByFeatureOrTagId(tagVal models.NilInt, featureVal models.NilInt, limit int, offset int) ([]models.UserBannerFilteredResponse, error) {
+	rows, err := s.Db.Query(`SELECT ub.id, ub.content, ub.is_active, ub.feature_id, ub.created_at, ub.updated_at, tag_id
 				FROM user_banners_tags join user_banners ub on ub.id = user_banners_tags.banner_id
 				where (feature_id = $1 OR $1 IS NULL) and (tag_id = $2 OR $2 IS NULL) 
 				ORDER BY created_at
@@ -130,10 +140,10 @@ func GetBannersFilteredByFeatureOrTagId(storage *Storage, tagVal models.NilInt, 
 	return banners, nil
 }
 
-func CreateUserBanner(storage *Storage, createBanner models.CreateBannerRequest) (models.UserBanner, error) {
+func (s *Storage) CreateUserBanner(createBanner models.CreateBannerRequest) (models.UserBanner, error) {
 
 	var banner = models.UserBanner{
-		Id:        GetNextUserBannerId(storage),
+		Id:        s.GetNextUserBannerId(),
 		Content:   createBanner.Content,
 		IsActive:  createBanner.IsActive,
 		FeatureId: createBanner.FeatureId,
@@ -144,7 +154,7 @@ func CreateUserBanner(storage *Storage, createBanner models.CreateBannerRequest)
 	fmt.Println(banner)
 
 	ctx := context.Background()
-	tx, err := storage.Db.BeginTx(ctx, nil)
+	tx, err := s.Db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -170,7 +180,7 @@ func CreateUserBanner(storage *Storage, createBanner models.CreateBannerRequest)
 	return banner, nil
 }
 
-func CreateUserBannerWithId(storage *Storage, createBanner models.CreateBannerRequest, id int) (models.UserBanner, error) {
+func (s *Storage) CreateUserBannerWithId(createBanner models.CreateBannerRequest, id int) (models.UserBanner, error) {
 
 	var banner = models.UserBanner{
 		Id:        id,
@@ -184,7 +194,7 @@ func CreateUserBannerWithId(storage *Storage, createBanner models.CreateBannerRe
 	fmt.Println(banner)
 
 	ctx := context.Background()
-	tx, err := storage.Db.BeginTx(ctx, nil)
+	tx, err := s.Db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -210,9 +220,9 @@ func CreateUserBannerWithId(storage *Storage, createBanner models.CreateBannerRe
 	return banner, nil
 }
 
-func GetNextUserBannerId(storage *Storage) int {
+func (s *Storage) GetNextUserBannerId() int {
 	var maxId int
-	err := storage.Db.QueryRow(`select MAX(id) FROM user_banners;`).Scan(&maxId)
+	err := s.Db.QueryRow(`select MAX(id) FROM user_banners;`).Scan(&maxId)
 	if err != nil {
 		slog.Error("error while saving new banner ", err)
 		return -1
@@ -220,16 +230,16 @@ func GetNextUserBannerId(storage *Storage) int {
 	return maxId + 1
 }
 
-func GetBannerById(storage *Storage, id int) (models.UserBanner, error) {
+func (s *Storage) GetBannerById(id int) (models.UserBanner, error) {
 	var banner models.UserBanner
-	err := storage.Db.QueryRow(`SELECT ub.id, ub.content, ub.is_active, ub.feature_id, ub.created_at, ub.updated_at
+	err := s.Db.QueryRow(`SELECT ub.id, ub.content, ub.is_active, ub.feature_id, ub.created_at, ub.updated_at
 										FROM  user_banners ub where id = $1`, id).Scan(&banner.Id, &banner.Content, &banner.IsActive, &banner.FeatureId, &banner.CreatedAt, &banner.UpdatedAt)
 	return banner, err
 }
 
-func UpdateUserBanner(storage *Storage, id int, request models.CreateBannerRequest, banner models.UserBanner) (models.UserBanner, error) {
+func (s *Storage) UpdateUserBanner(id int, request models.CreateBannerRequest, banner models.UserBanner) (models.UserBanner, error) {
 	ctx := context.Background()
-	tx, err := storage.Db.BeginTx(ctx, nil)
+	tx, err := s.Db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -271,9 +281,9 @@ func UpdateUserBanner(storage *Storage, id int, request models.CreateBannerReque
 	}, nil
 }
 
-func DeleteBannerById(storage *Storage, id int) error {
+func (s *Storage) DeleteBannerById(id int) error {
 	ctx := context.Background()
-	tx, err := storage.Db.BeginTx(ctx, nil)
+	tx, err := s.Db.BeginTx(ctx, nil)
 	if err != nil {
 		log.Fatal(err)
 		return err

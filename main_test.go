@@ -3,7 +3,6 @@ package main
 import (
 	"banner-service/internal/http-server/router"
 	"banner-service/internal/models"
-	"banner-service/internal/repositories/postgres"
 	"banner-service/internal/repositories/postgres/mockdb"
 	"banner-service/internal/repositories/redis/mock-cache"
 	"encoding/json"
@@ -121,7 +120,7 @@ func TestCreateBanner(t *testing.T) {
 		t.Errorf("HandleGetUserBannerTest() test returned an unexpected result: got %v want %v", resp.StatusCode, statusCode)
 	}
 
-	err = postgres.DeleteBannerById(db, 11)
+	err = db.DeleteBannerById(11)
 	if err != nil {
 		t.Fatal("created banner not deleted((")
 	}
@@ -210,7 +209,7 @@ func TestDeleteBanner(t *testing.T) {
 		IsActive:  isActive,
 	}
 
-	postgres.CreateUserBannerWithId(db, banner, 4)
+	db.CreateUserBannerWithId(banner, 4)
 	if err != nil {
 		t.Fatal("create banner after delete error")
 	}

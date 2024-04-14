@@ -12,7 +12,7 @@ import (
 )
 
 type Redis struct {
-	Client *redis.Client
+	*redis.Client
 }
 
 func New() (*Redis, error) {
@@ -32,34 +32,34 @@ func New() (*Redis, error) {
 	return &Redis{Client: client}, nil
 }
 
-func PutBanner(client Redis, tagId int, featureId int, banner models.UserBanner) {
+func (r *Redis) PutBanner(tagId int, featureId int, banner models.UserBanner) {
 	ctx := context.Background()
 	data, err := json.Marshal(banner)
 	if err != nil {
 		slog.Error("error while converting user-banner to json")
 		panic(err)
 	}
-	err = client.Client.Set(ctx, fmt.Sprintf("%d %d", tagId, featureId), data, 5*time.Minute).Err()
+	err = r.Set(ctx, fmt.Sprintf("%d %d", tagId, featureId), data, 5*time.Minute).Err()
 	if err != nil {
 		slog.Error("error while saving user-banner to redis")
 		panic(err)
 	}
 }
 
-func PutEmptyBanner(client Redis, tagId int, featureId int) {
+func (r *Redis) PutEmptyBanner(tagId int, featureId int) {
 	ctx := context.Background()
 
-	err := client.Client.Set(ctx, fmt.Sprintf("%d %d", tagId, featureId), "empty", 5*time.Minute).Err()
+	err := r.Set(ctx, fmt.Sprintf("%d %d", tagId, featureId), "empty", 5*time.Minute).Err()
 	if err != nil {
 		slog.Error("error while saving user-banner to redis")
 		panic(err)
 	}
 }
 
-func IsEmptyBammer(client Redis, tagId int, featureId int) bool {
+func (r *Redis) IsEmptyBanner(tagId int, featureId int) bool {
 	ctx := context.Background()
 
-	req := client.Client.Get(ctx, fmt.Sprintf("%d %d", tagId, featureId))
+	req := r.Get(ctx, fmt.Sprintf("%d %d", tagId, featureId))
 	if err := req.Err(); err != nil {
 		slog.Info("unable to GET data. error: %v", err)
 		return false
@@ -71,12 +71,11 @@ func IsEmptyBammer(client Redis, tagId int, featureId int) bool {
 		return false
 	}
 	return data == "empty"
-
 }
 
-func GetBannerById(redisClient Redis, tagId int, featureId int, banner interface{}) bool {
+func (r *Redis) GetBannerById(tagId int, featureId int, banner interface{}) bool {
 	ctx := context.Background()
-	req := redisClient.Client.Get(ctx, fmt.Sprintf("%d %d", tagId, featureId))
+	req := r.Get(ctx, fmt.Sprintf("%d %d", tagId, featureId))
 	if err := req.Err(); err != nil {
 		slog.Info("unable to GET data. error: %v", err)
 		return false
@@ -90,9 +89,9 @@ func GetBannerById(redisClient Redis, tagId int, featureId int, banner interface
 	return true
 }
 
-func GetBannerGroup(redisClient Redis, tagVal models.NilInt, featureVal models.NilInt, limit int, offset int) ([]models.UserBannerFilteredResponse, error) {
+func (r *Redis) GetBannerGroup(tagVal models.NilInt, featureVal models.NilInt, limit int, offset int) ([]models.UserBannerFilteredResponse, error) {
 	ctx := context.Background()
-	req := redisClient.Client.Get(ctx, fmt.Sprintf("group %d %d %d %d", tagVal.GetValue(), featureVal.GetValue(), limit, offset))
+	req := r.Get(ctx, fmt.Sprintf("group %d %d %d %d", tagVal.GetValue(), featureVal.GetValue(), limit, offset))
 	if err := req.Err(); err != nil {
 		slog.Info("unable to GET data. error: %v", err)
 		return nil, err
@@ -106,14 +105,14 @@ func GetBannerGroup(redisClient Redis, tagVal models.NilInt, featureVal models.N
 	return banners, nil
 }
 
-func PutBannerGroup(redisClient Redis, tagVal models.NilInt, featureVal models.NilInt, banners []models.UserBannerFilteredResponse, limit int, offset int) {
+func (r *Redis) PutBannerGroup(tagVal models.NilInt, featureVal models.NilInt, banners []models.UserBannerFilteredResponse, limit int, offset int) {
 	ctx := context.Background()
 	data, err := json.Marshal(banners)
 	if err != nil {
 		slog.Info("unable to SET data. error: %v", err)
 		return
 	}
-	req := redisClient.Client.Set(ctx, fmt.Sprintf("group %d %d %d %d", tagVal.GetValue(), featureVal.GetValue(), limit, offset), data, 5*time.Minute)
+	req := r.Set(ctx, fmt.Sprintf("group %d %d %d %d", tagVal.GetValue(), featureVal.GetValue(), limit, offset), data, 5*time.Minute)
 	if err := req.Err(); err != nil {
 		slog.Info("unable to SET data. error: %v", err)
 		return

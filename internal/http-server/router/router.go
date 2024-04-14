@@ -1,8 +1,7 @@
 package router
 
 import (
-	"banner-service/internal/http-server/handlers/api/banner"
-	user_banner "banner-service/internal/http-server/handlers/api/user-banner"
+	"banner-service/internal/http-server/handlers/api"
 	"banner-service/internal/http-server/handlers/auth/token"
 	"banner-service/internal/repositories/postgres"
 	"banner-service/internal/repositories/redis"
@@ -18,12 +17,12 @@ func Routes(redisClient *redis.Redis, db *postgres.Storage) *fiber.App {
 	app.Use(logger.New())
 	app.Use(token.NewTokenHandler())
 
-	app.Get("/ping", user_banner.Ping)
-	app.Get("/user_banner", user_banner.GetBannerById(redisClient, db))
-	app.Get("/banner", banner.GetBannersFiltered(redisClient, db))
-	app.Post("/banner", banner.CreateBanner(redisClient, db))
-	app.Patch("/banner/:id", banner.UpdateBanner(redisClient, db))
-	app.Delete("/banner/:id", banner.DeleteBanner(redisClient, db))
+	app.Get("/ping", api.Ping)
+	app.Get("/user_banner", api.GetBannerById(redisClient, db))
+	app.Get("/banner", api.GetBannersFiltered(redisClient, db))
+	app.Post("/banner", api.CreateBanner(redisClient, db))
+	app.Patch("/banner/:id", api.UpdateBanner(redisClient, db))
+	app.Delete("/banner/:id", api.DeleteBanner(redisClient, db))
 
 	return app
 }

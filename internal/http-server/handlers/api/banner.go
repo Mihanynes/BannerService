@@ -1,9 +1,10 @@
-package banner
+// banner/banner.go
+
+package api
 
 import (
 	"banner-service/internal/models"
-	"banner-service/internal/repositories/postgres"
-	"banner-service/internal/repositories/redis"
+	"banner-service/internal/repositories"
 	"encoding/json"
 	"fmt"
 	"github.com/go-playground/validator/v10"
@@ -12,7 +13,7 @@ import (
 	"strconv"
 )
 
-func GetBannersFiltered(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler {
+func GetBannersFiltered(cache repositories.Cache, db repositories.Database) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if c.Get("token") != "admin_token" {
 			return c.Status(fiber.StatusForbidden).SendString("Unauthorized access")
@@ -47,57 +48,22 @@ func GetBannersFiltered(redisClient *redis.Redis, db *postgres.Storage) fiber.Ha
 
 		fmt.Println("limit", limit, "offset", offset)
 
-		data, err := redis.GetBannerGroup(*redisClient, tagVal, featureVal, limit, offset)
+		data, err := cache.GetBannerGroup(tagVal, featureVal, limit, offset)
 		if err == nil {
 			return c.JSON(data)
 		}
 
-		banners, err := postgres.GetBannersFilteredByFeatureOrTagId(db, tagVal, featureVal, limit, offset)
+		banners, err := db.GetBannersFilteredByFeatureOrTagId(tagVal, featureVal, limit, offset)
 		if err != nil {
 			slog.Error("error while getting filtered banners")
 			return c.Status(fiber.StatusInternalServerError).SendString("Internal Server Error")
 		}
-		redis.PutBannerGroup(*redisClient, tagVal, featureVal, banners, limit, offset)
+		cache.PutBannerGroup(tagVal, featureVal, banners, limit, offset)
 		return c.JSON(banners)
 	}
 }
 
-//func CreateBanner(redisClient *redis.Redis, db *postgres.Storage) http.HandlerFunc {
-//	return func(w http.ResponseWriter, r *http.Request) {
-//		if r.Header.Get("token") != "admin_token" {
-//			resp.Send403Error(w, r)
-//			return
-//		}
-//		var createBanner models.CreateBannerRequest
-//		decoder := json.NewDecoder(r.Body)
-//		decoder.DisallowUnknownFields()
-//		err := decoder.Decode(&createBanner)
-//		validate := validator.New()
-//		err2 := validate.Struct(createBanner)
-//		if err != nil || err2 != nil {
-//			slog.Error("error while parsing request body")
-//			resp.Send400Error(w, r)
-//			return
-//		}
-//		slog.Info("continue updating ", err, err2)
-//		banner, err := postgres.CreateUserBanner(db, createBanner)
-//		if err != nil {
-//			slog.Error("error while saving new banner")
-//			resp.Send500Error(w, r)
-//			return
-//		}
-//
-//		slog.Info("success saved new banner " + string(banner.Id))
-//		for _, tagId := range createBanner.TagIds {
-//			redis.PutBanner(*redisClient, tagId, banner.FeatureId, banner)
-//		}
-//		//redis.PutBanner(*redisClient, )
-//		w.WriteHeader(http.StatusCreated)
-//		render.JSON(w, r, banner.Id)
-//	}
-//}
-
-func CreateBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler {
+func CreateBanner(cache repositories.Cache, db repositories.Database) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if c.Get("token") != "admin_token" {
 			return c.Status(fiber.StatusForbidden).SendString("Unauthorized access")
@@ -115,7 +81,7 @@ func CreateBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler 
 			return c.Status(fiber.StatusBadRequest).SendString("Invalid request body")
 		}
 
-		banner, err := postgres.CreateUserBanner(db, createBanner)
+		banner, err := db.CreateUserBanner(createBanner)
 		if err != nil {
 			slog.Error("error while saving new banner")
 			return c.Status(fiber.StatusInternalServerError).SendString("Error saving new banner")
@@ -123,14 +89,14 @@ func CreateBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler 
 
 		slog.Info("successfully saved new banner " + string(banner.Id))
 		for _, tagID := range createBanner.TagIds {
-			redis.PutBanner(*redisClient, tagID, banner.FeatureId, banner)
+			cache.PutBanner(tagID, banner.FeatureId, banner)
 		}
 
 		return c.Status(fiber.StatusCreated).JSON(banner.Id)
 	}
 }
 
-func UpdateBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler {
+func UpdateBanner(cache repositories.Cache, db repositories.Database) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if c.Get("token") != "admin_token" {
 			return c.Status(fiber.StatusForbidden).SendString("Unauthorized access")
@@ -150,31 +116,32 @@ func UpdateBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler 
 
 		id, err := strconv.Atoi(c.Params("id"))
 		if err != nil {
+			fmt.Println(id)
 			slog.Error("error while parsing request id", err)
 			return c.Status(fiber.StatusBadRequest).SendString("Error parsing request ID")
 		}
 
-		banner, err := postgres.GetBannerById(db, id)
+		banner, err := db.GetBannerById(id)
 		if err != nil {
 			slog.Error("error while getting banner by id ", id, err)
 			return c.Status(fiber.StatusNotFound).SendString("Banner not found")
 		}
 
-		updatedBanner, err := postgres.UpdateUserBanner(db, id, bannerRequest, banner)
+		updatedBanner, err := db.UpdateUserBanner(id, bannerRequest, banner)
 		if err != nil {
 			slog.Error("error while updating banner", err)
 			return c.Status(fiber.StatusInternalServerError).SendString("Error updating banner")
 		}
 
 		for _, tagID := range bannerRequest.TagIds {
-			redis.PutBanner(*redisClient, tagID, banner.FeatureId, updatedBanner)
+			cache.PutBanner(tagID, banner.FeatureId, updatedBanner)
 		}
 
 		return c.Status(fiber.StatusOK).SendString("Banner updated successfully")
 	}
 }
 
-func DeleteBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler {
+func DeleteBanner(cache repositories.Cache, db repositories.Database) fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		if c.Get("token") != "admin_token" {
 			return c.Status(fiber.StatusForbidden).SendString("Unauthorized access")
@@ -186,18 +153,18 @@ func DeleteBanner(redisClient *redis.Redis, db *postgres.Storage) fiber.Handler 
 			return c.Status(fiber.StatusBadRequest).SendString("Error parsing request ID")
 		}
 
-		_, err = postgres.GetBannerById(db, id)
+		_, err = db.GetBannerById(id)
 		if err != nil {
 			slog.Error("error while getting banner by id ", id, err)
 			return c.Status(fiber.StatusNotFound).SendString("Banner not found")
 		}
 
-		err = postgres.DeleteBannerById(db, id)
+		err = db.DeleteBannerById(id)
 		if err != nil {
 			slog.Error("error while deleting banner", id, err)
 			return c.Status(fiber.StatusInternalServerError).SendString("Error deleting banner")
 		}
 
-		return c.SendStatus(fiber.StatusNoContent)
+		return c.Status(fiber.StatusNoContent).SendString("Banner deleted")
 	}
 }
