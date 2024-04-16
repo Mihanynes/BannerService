@@ -1,4 +1,5 @@
 <h1>Тестовое задание в Авито на Golang</h1>
+Тз: https://github.com/avito-tech/backend-trainee-assignment-2024
 
 <h2>Запуск</h2>
 Запуск приложения через контейнеры
